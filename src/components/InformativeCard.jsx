@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import "../styles/informative-card.css";
 
 export function InformativeCard({
@@ -8,45 +8,125 @@ export function InformativeCard({
 
   const [currentSlide, setCurrentSlide] = useState(0);
 
+  const [isPaused, setIsPaused] = useState(false);
+
+  const [showOverlayIcon, setShowOverlayIcon] = useState(false);
+
+  const [overlayType, setOverlayType] = useState("pause");
+
+  const [progressKey, setProgressKey] = useState(0);
+
+  const [isVisible, setIsVisible] = useState(true);
+
+  const timeoutRef = useRef(null);
+
   const totalSlides = slides.length;
 
-  useEffect(() => {
+useEffect(() => {
 
-    const interval = setInterval(() => {
+  if (isPaused) return;
 
-      setCurrentSlide((prev) => {
+const timeout = setTimeout(() => {
 
-        if (prev < totalSlides - 1) {
-          return prev + 1;
-        }
+  setCurrentSlide((prev) => {
 
-        return prev;
+    const nextSlide =
+      prev < totalSlides - 1
+        ? prev + 1
+        : 0;
 
-      });
+    setProgressKey(prev => prev + 1);
 
-    }, 7000);
+    return nextSlide;
 
-    return () => clearInterval(interval);
+  });
 
-  }, [totalSlides]);
+}, 7000);
 
-  const handleNext = () => {
+return () => clearTimeout(timeout);
 
-    if (currentSlide < totalSlides - 1) {
-      setCurrentSlide(currentSlide + 1);
-    } else {
-      alert("Cerrar");
-    }
+}, [currentSlide, isPaused, totalSlides]);
 
-  };
+const handleNext = () => {
+
+  if (currentSlide < totalSlides - 1) {
+
+    setCurrentSlide(currentSlide + 1);
+
+    setProgressKey(prev => prev + 1);
+
+  } else {
+
+    setIsVisible(false);
+
+    console.log("Componente cerrado");
+
+  }
+
+};
+
+const handleSeeLater = () => {
+
+  localStorage.setItem(
+    "showInformativeCardLater",
+    "true"
+  );
+
+  setIsVisible(false);
+
+  console.log(
+    "Usuario quiere ver el componente en la siguiente sesión"
+  );
+};
+
+const handleImageClick = () => {
+
+  const nextPaused = !isPaused;
+
+  setIsPaused(nextPaused);
+
+  setOverlayType(
+    nextPaused ? "pause" : "play"
+  );
+
+  setShowOverlayIcon(false);
+
+  requestAnimationFrame(() => {
+    setShowOverlayIcon(true);
+  });
+
+  setProgressKey(prev => prev + 1);
+
+  clearTimeout(timeoutRef.current);
+
+  timeoutRef.current = setTimeout(() => {
+
+    setShowOverlayIcon(false);
+
+  }, 2000);
+};
+
+if (!isVisible) return null;
 
   return (
     <div className="informative-card">
 
       {showClose && (
-        <button className="close-button">
-          ×
-        </button>
+      <button
+        className="close-button"
+        onClick={() => setIsVisible(false)}
+      >
+        ×
+      </button>
+      )}
+
+      {slides[currentSlide]?.tagText && (
+        <a
+          href={slides[currentSlide]?.tagLink}
+          className="floating-card-tag"
+        >
+          {slides[currentSlide]?.tagText}
+        </a>
       )}
 
       <div className="slider-wrapper">
@@ -61,22 +141,31 @@ export function InformativeCard({
           {slides.map((slide, index) => (
             <div className="slide" key={index}>
 
-              <div className="image-container">
+              <div
+                className="image-container"
+                onClick={handleImageClick}
+                >
 
                 <img
                   src={slide.image}
                   alt={slide.title}
                   className="card-image"
                 />
+                  {showOverlayIcon && currentSlide === index && (
+                  <div className="media-overlay">
 
-                {slide.tagText && (
-                  <a
-                    href={slide.tagLink}
-                    className="card-tag"
-                  >
-                    {slide.tagText}
-                  </a>
-                )}
+                    {overlayType === "pause" ? (
+                      <div className="pause-icon">
+                        ❚❚
+                      </div>
+                    ) : (
+                      <div className="play-icon">
+                        ▶
+                      </div>
+                    )}
+
+                  </div>
+                  )}
 
               </div>
 
@@ -85,19 +174,30 @@ export function InformativeCard({
 
                   {slides.map((_, dotIndex) => (
 
-                    <div
-                      key={dotIndex}
-                      className={`pagination-item ${
-                        dotIndex < currentSlide
-                          ? "completed"
-                          : dotIndex === currentSlide
-                          ? "progress"
-                          : "pending"
-                      }`}
-                    >
+                      <div
+                        key={dotIndex}
+                        onClick={() => {
+
+                          setCurrentSlide(dotIndex);
+                          setProgressKey(prev => prev + 1);
+                          setShowOverlayIcon(false);
+                        }}
+                        className={`pagination-item ${
+                          dotIndex < currentSlide
+                            ? "completed"
+                            : dotIndex === currentSlide
+                            ? "progress"
+                            : "pending"
+                        }`}
+                      >
 
                       {dotIndex === currentSlide ? (
-                        <div className="progress-bar-fill" />
+                        <div
+                          key={`${currentSlide}-${progressKey}-${isPaused}`}
+                          className={`progress-bar-fill ${
+                            isPaused ? "paused" : ""
+                          }`}
+                        />
                       ) : null}
 
                     </div>
@@ -135,7 +235,10 @@ export function InformativeCard({
 
         </button>
 
-        <button className="secondary-button">
+        <button
+          className="secondary-button"
+          onClick={handleSeeLater}
+        >
           Ver después
         </button>
 
