@@ -8,7 +8,7 @@ export default {
 export const Default = {
   args: {
     showClose: true,
-
+    enableMediaControls: false,
     slides: [
       {
         title: "Descubre lo nuevo en Strateggie",
@@ -23,48 +23,11 @@ export const Default = {
   },
 };
 
-export const Carousel = {
-  args: {
-    showClose: false,
-
-    slides: [
-      {
-        title: "Explora funcionalidades",
-
-        description:
-          "Navega entre las nuevas funcionalidades y descubre herramientas útiles.",
-
-        image:
-          "https://media.giphy.com/media/ICOgUNjpvO0PC/giphy.gif",
-      },
-
-      {
-        title: "Automatiza procesos",
-
-        description:
-          "Ahorra tiempo con herramientas inteligentes.",
-
-        image:
-          "https://media.giphy.com/media/l0HlNaQ6gWfllcjDO/giphy.gif",
-      },
-
-      {
-        title: "Todo listo",
-
-        description:
-          "Empieza a disfrutar de la experiencia.",
-
-        image:
-          "https://media.giphy.com/media/3o7aD2saalBwwftBIY/giphy.gif",
-      },
-    ],
-  },
-};
 
 export const CarouselWithClose = {
   args: {
     showClose: true,
-
+    enableMediaControls: true,
     slides: [
       {
         title: "Nuevas actualizaciones",

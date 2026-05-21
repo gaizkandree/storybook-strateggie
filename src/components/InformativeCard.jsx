@@ -4,6 +4,7 @@ import "../styles/informative-card.css";
 export function InformativeCard({
   slides = [],
   showClose = false,
+  enableMediaControls = false,
 }) {
 
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -19,105 +20,126 @@ export function InformativeCard({
   const [isVisible, setIsVisible] = useState(true);
 
   const timeoutRef = useRef(null);
+  const slideStartTimeRef = useRef(Date.now()); // Momento en que comenzó el slide actual
+  const remainingTimeRef = useRef(7000);        // Tiempo restante antes de avanzar
 
   const totalSlides = slides.length;
 
-useEffect(() => {
+  const SLIDE_DURATION = 7000;
 
-  if (isPaused) return;
+  // FIX #1: Cleanup del timeoutRef al desmontar el componente
+  useEffect(() => {
+    return () => clearTimeout(timeoutRef.current);
+  }, []);
 
-const timeout = setTimeout(() => {
+  // FIX PAUSE: El timer ahora respeta el tiempo ya transcurrido al reanudar,
+  // en lugar de reiniciarse desde 7000ms cada vez que cambia isPaused.
+  useEffect(() => {
 
-  setCurrentSlide((prev) => {
+    clearTimeout(timeoutRef.current);
 
-    const nextSlide =
-      prev < totalSlides - 1
-        ? prev + 1
-        : 0;
+    if (isPaused) {
+      // Guardar cuánto tiempo queda al pausar
+      const elapsed = Date.now() - slideStartTimeRef.current;
+      remainingTimeRef.current = Math.max(0, remainingTimeRef.current - elapsed);
+      return;
+    }
 
-    setProgressKey(prev => prev + 1);
+    // Al reanudar (o al cambiar de slide), registrar el momento de inicio
+    slideStartTimeRef.current = Date.now();
 
-    return nextSlide;
+    timeoutRef.current = setTimeout(() => {
 
-  });
+      setCurrentSlide((prev) => {
+        const nextSlide = prev < totalSlides - 1 ? prev + 1 : 0;
+        setProgressKey(p => p + 1);
+        return nextSlide;
+      });
 
-}, 7000);
+      // Resetear tiempo restante para el siguiente slide
+      remainingTimeRef.current = SLIDE_DURATION;
 
-return () => clearTimeout(timeout);
+    }, remainingTimeRef.current);
 
-}, [currentSlide, isPaused, totalSlides]);
+    return () => clearTimeout(timeoutRef.current);
 
-const handleNext = () => {
+  }, [currentSlide, isPaused, totalSlides]);
 
-  if (currentSlide < totalSlides - 1) {
+  const handleNext = () => {
 
-    setCurrentSlide(currentSlide + 1);
+    if (currentSlide < totalSlides - 1) {
 
-    setProgressKey(prev => prev + 1);
+      remainingTimeRef.current = SLIDE_DURATION; // Resetear para el nuevo slide
+      setCurrentSlide(currentSlide + 1);
+      setProgressKey(prev => prev + 1);
 
-  } else {
+    } else {
+
+      setIsVisible(false);
+
+      console.log("Componente cerrado");
+
+    }
+
+  };
+
+  const handleSeeLater = () => {
+
+    // FIX #3: localStorage con try/catch para entornos SSR o sin soporte
+    try {
+      localStorage.setItem(
+        "showInformativeCardLater",
+        "true"
+      );
+    } catch (e) {
+      console.warn("localStorage no disponible:", e);
+    }
 
     setIsVisible(false);
 
-    console.log("Componente cerrado");
+    console.log(
+      "Usuario quiere ver el componente en la siguiente sesión"
+    );
 
-  }
+  };
 
-};
+  const handleImageClick = () => {
 
-const handleSeeLater = () => {
+    const nextPaused = !isPaused;
 
-  localStorage.setItem(
-    "showInformativeCardLater",
-    "true"
-  );
+    setIsPaused(nextPaused);
 
-  setIsVisible(false);
-
-  console.log(
-    "Usuario quiere ver el componente en la siguiente sesión"
-  );
-};
-
-const handleImageClick = () => {
-
-  const nextPaused = !isPaused;
-
-  setIsPaused(nextPaused);
-
-  setOverlayType(
-    nextPaused ? "pause" : "play"
-  );
-
-  setShowOverlayIcon(false);
-
-  requestAnimationFrame(() => {
-    setShowOverlayIcon(true);
-  });
-
-  setProgressKey(prev => prev + 1);
-
-  clearTimeout(timeoutRef.current);
-
-  timeoutRef.current = setTimeout(() => {
+    setOverlayType(nextPaused ? "pause" : "play");
 
     setShowOverlayIcon(false);
 
-  }, 2000);
-};
+    requestAnimationFrame(() => {
+      setShowOverlayIcon(true);
+    });
 
-if (!isVisible) return null;
+    // El overlay icon desaparece tras 2s (timeoutRef reutilizado solo para esto)
+    clearTimeout(timeoutRef.current);
+
+    timeoutRef.current = setTimeout(() => {
+      setShowOverlayIcon(false);
+    }, 2000);
+
+  };
+
+  if (!isVisible) return null;
 
   return (
     <div className="informative-card">
 
       {showClose && (
-      <button
-        className="close-button"
-        onClick={() => setIsVisible(false)}
-      >
-        ×
-      </button>
+        <button
+          className="close-button"
+          onClick={() => setIsVisible(false)}
+          // FIX #7: aria-label para accesibilidad en teclado y lectores de pantalla
+          aria-label="Cerrar"
+        >
+          ×
+        </button>
       )}
 
       {slides[currentSlide]?.tagText && (
@@ -142,29 +164,37 @@ if (!isVisible) return null;
             <div className="slide" key={index}>
 
               <div
-                className="image-container"
-                onClick={handleImageClick}
-                >
+                // FIX #5: Clase .media-enabled aplicada condicionalmente en JSX
+                className={`image-container ${enableMediaControls ? "media-enabled" : ""}`}
+                onClick={
+                  enableMediaControls
+                    ? handleImageClick
+                    : undefined
+                }
+              >
 
                 <img
                   src={slide.image}
                   alt={slide.title}
                   className="card-image"
                 />
-                  {showOverlayIcon && currentSlide === index && (
-                  <div className="media-overlay">
 
-                    {overlayType === "pause" ? (
-                      <div className="pause-icon">
-                        ❚❚
-                      </div>
-                    ) : (
-                      <div className="play-icon">
-                        ▶
-                      </div>
-                    )}
+                {enableMediaControls &&
+                  showOverlayIcon &&
+                  currentSlide === index && (
+                    <div className="media-overlay">
 
-                  </div>
+                      {overlayType === "pause" ? (
+                        <div className="pause-icon">
+                          ❚❚
+                        </div>
+                      ) : (
+                        <div className="play-icon">
+                          ▶
+                        </div>
+                      )}
+
+                    </div>
                   )}
 
               </div>
@@ -174,22 +204,24 @@ if (!isVisible) return null;
 
                   {slides.map((_, dotIndex) => (
 
-                      <div
-                        key={dotIndex}
-                        onClick={() => {
+                    <div
+                      key={dotIndex}
+                      onClick={() => {
 
-                          setCurrentSlide(dotIndex);
-                          setProgressKey(prev => prev + 1);
-                          setShowOverlayIcon(false);
-                        }}
-                        className={`pagination-item ${
-                          dotIndex < currentSlide
-                            ? "completed"
-                            : dotIndex === currentSlide
-                            ? "progress"
-                            : "pending"
-                        }`}
-                      >
+                        remainingTimeRef.current = SLIDE_DURATION; // Resetear para el slide seleccionado
+                        setCurrentSlide(dotIndex);
+                        setProgressKey(prev => prev + 1);
+                        setShowOverlayIcon(false);
+
+                      }}
+                      className={`pagination-item ${
+                        dotIndex < currentSlide
+                          ? "completed"
+                          : dotIndex === currentSlide
+                          ? "progress"
+                          : "pending"
+                      }`}
+                    >
 
                       {dotIndex === currentSlide ? (
                         <div
